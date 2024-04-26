@@ -1,0 +1,85 @@
+﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using TodoAPI.Models;
+using TodoAPI.ViewModels;
+
+namespace TodoAPI.Services;
+
+public class TodoService : ITodoService
+{
+    private readonly TodoApiDbContext _context;
+    private readonly IMapper _mapper;
+
+    public TodoService(TodoApiDbContext context, IMapper mapper)
+    {
+        _context = context;
+        _mapper = mapper;
+    }
+
+    public async Task<IEnumerable<TodoViewModel>> GetTodos(int userId)
+    {
+        var todos = await _context.Todos
+            .Where(todo => todo.UserId == userId)
+            .ToListAsync();
+
+        return _mapper.Map<IEnumerable<TodoViewModel>>(todos);
+    }
+
+    public async Task<TodoViewModel> GetTodoById(int id)
+    {
+        var todo = await _context.Todos.FirstOrDefaultAsync(todo => todo.Id == id);
+
+        return _mapper.Map<TodoViewModel>(todo);
+    }
+
+    public async Task<TodoViewModel> CreateTodo(TodoViewModel todoViewModel, int userId)
+    {
+        var todo = _mapper.Map<Todo>(todoViewModel);
+        todo.UserId = userId;
+
+        _context.Add(todo);
+        await _context.SaveChangesAsync();
+
+        return _mapper.Map<TodoViewModel>(todo);
+    }
+
+    public async Task<TodoViewModel> UpdateTodo(TodoViewModel todoViewModel, int userId)
+    {
+        var todo = _context.Todos.FirstOrDefault(todo => todo.Id == todoViewModel.Id);
+
+        if (todo == null)
+        {
+            throw new Exception("The ToDo you are looking for does not exist!");
+        }
+
+        if (TodoExists(todoViewModel.Id))
+        {
+            todo.Item = todoViewModel.Item;
+            todo.IsCompleted = todoViewModel.IsCompleted;
+            todo.DueOn = todoViewModel.DueOn;
+            todo.UserId = userId;
+            todo.UpdatedAt = DateTime.Now;
+        }
+
+        _context.Update(todo);
+        await _context.SaveChangesAsync();
+
+        return _mapper.Map<TodoViewModel>(todo); ;
+    }
+
+    public async Task DeleteTodo(int id)
+    {
+        var todo = await _context.Todos.FirstOrDefaultAsync(todo => todo.Id == id);
+
+        if (todo != null)
+        {
+            _context.Remove(todo);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public bool TodoExists(int id)
+    {
+        return _context.Todos.Any(todo => todo.Id == id);
+    }
+}
